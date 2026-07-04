@@ -35,6 +35,12 @@ COSTS_PATH = "/organization/costs"
 USAGE_GROUP_BY = ["project_id", "api_key_id", "model", "batch", "service_tier"]
 COSTS_GROUP_BY = ["project_id", "api_key_id"]
 
+# Max `limit` (number of daily buckets per page) differs by endpoint at
+# bucket_width=1d: usage caps at 31, costs at 180. Pagination (via
+# has_more/next_page) covers any range longer than these.
+USAGE_MAX_LIMIT = 31
+COSTS_MAX_LIMIT = 180
+
 MAX_RETRIES = 5
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
@@ -94,11 +100,11 @@ def _paginate(client: httpx.Client, path: str, params: dict) -> Iterator[dict]:
         page_params = dict(params, page=payload["next_page"])
 
 
-def _time_range_params(since: datetime, until: datetime | None) -> dict:
+def _time_range_params(since: datetime, until: datetime | None, max_limit: int) -> dict:
     params: dict = {
         "start_time": int(since.timestamp()),
         "bucket_width": "1d",
-        "limit": 180,
+        "limit": max_limit,
     }
     if until is not None:
         params["end_time"] = int(until.timestamp())
@@ -106,7 +112,7 @@ def _time_range_params(since: datetime, until: datetime | None) -> dict:
 
 
 def _fetch_usage_rows(client: httpx.Client, since: datetime, until: datetime | None) -> list[_UsageRow]:
-    params = _time_range_params(since, until)
+    params = _time_range_params(since, until, USAGE_MAX_LIMIT)
     params["group_by"] = USAGE_GROUP_BY
     rows = []
     for bucket in _paginate(client, USAGE_PATH, params):
@@ -129,7 +135,7 @@ def _fetch_usage_rows(client: httpx.Client, since: datetime, until: datetime | N
 
 
 def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | None) -> list[_CostRow]:
-    params = _time_range_params(since, until)
+    params = _time_range_params(since, until, COSTS_MAX_LIMIT)
     params["group_by"] = COSTS_GROUP_BY
     rows = []
     for bucket in _paginate(client, COSTS_PATH, params):

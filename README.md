@@ -37,5 +37,7 @@ llm-spend report
 
 ## Status
 
-v0.1, under active development. `pull`/`import`/`report` are stubbed pending
-the provider connectors.
+v0.1, under active development.
+
+- `pull --provider openai` works: usage+costs, pagination, rate-limit backoff.
+- `pull --provider anthropic`, `import`, and `report` are still stubbed.

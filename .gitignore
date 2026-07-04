@@ -4,6 +4,9 @@
 *.pem
 *.key
 
+# Local Claude Code config (personal, not repo content)
+.claude/
+
 # Local data cache (pulled usage/cost data, never committed)
 .llm-spend-cache/
 cache/
