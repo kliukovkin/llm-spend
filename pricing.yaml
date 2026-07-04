@@ -1,0 +1,78 @@
+# Model pricing table for llm-spend.
+#
+# Used ONLY for same-model what-if comparisons (batch gap, service-tier gap,
+# cache hit-rate savings). Actual spend always comes from each provider's
+# cost/usage API — never from this file. If this file drifts from reality,
+# what-if numbers drift; billing totals do not.
+#
+# All prices are USD per 1,000,000 tokens. Updated manually — no fetching at
+# runtime. Deprecated/retired models are intentionally omitted; add them back
+# if you need to analyze historical usage against a retired model.
+#
+# Sources (fetched 2026-07-03):
+#   https://platform.claude.com/docs/en/about-claude/pricing
+#   https://developers.openai.com/api/docs/pricing
+as_of: "2026-07-03"
+
+openai:
+  gpt-5.5:
+    input: 5.00
+    cached_input: 0.50
+    output: 30.00
+    batch_input: 2.50
+    batch_output: 15.00
+  gpt-5.4:
+    input: 2.50
+    cached_input: 0.25
+    output: 15.00
+    batch_input: 1.25
+    batch_output: 7.50
+  gpt-5.4-mini:
+    input: 0.75
+    cached_input: 0.075
+    output: 4.50
+    batch_input: 0.375
+    batch_output: 2.25
+  gpt-5.4-nano:
+    input: 0.20
+    cached_input: 0.02
+    output: 1.25
+    batch_input: 0.10
+    batch_output: 0.625
+
+anthropic:
+  claude-fable-5:
+    input: 10.00
+    output: 50.00
+    cache_write_5m: 12.50
+    cache_write_1h: 20.00
+    cache_read: 1.00
+    batch_input: 5.00
+    batch_output: 25.00
+  claude-opus-4-8:
+    input: 5.00
+    output: 25.00
+    cache_write_5m: 6.25
+    cache_write_1h: 10.00
+    cache_read: 0.50
+    batch_input: 2.50
+    batch_output: 12.50
+  claude-sonnet-5:
+    # Introductory pricing through 2026-08-31; standard pricing (3.00/15.00,
+    # cache_write_5m 3.75, cache_write_1h 6.00, cache_read 0.30, batch
+    # 1.50/7.50) takes effect 2026-09-01. Update this block after that date.
+    input: 2.00
+    output: 10.00
+    cache_write_5m: 2.50
+    cache_write_1h: 4.00
+    cache_read: 0.20
+    batch_input: 1.00
+    batch_output: 5.00
+  claude-haiku-4-5:
+    input: 1.00
+    output: 5.00
+    cache_write_5m: 1.25
+    cache_write_1h: 2.00
+    cache_read: 0.10
+    batch_input: 0.50
+    batch_output: 2.50
