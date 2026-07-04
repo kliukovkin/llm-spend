@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -42,3 +42,16 @@ class UsageRecord:
             raise ValueError("cost_usd must be >= 0")
         if self.cached_tokens > self.input_tokens:
             raise ValueError("cached_tokens cannot exceed input_tokens")
+
+
+def to_json_dict(record: UsageRecord) -> dict:
+    """JSON-safe representation, used by both the pull cache and synth_data."""
+    data = asdict(record)
+    data["bucket_ts"] = record.bucket_ts.isoformat()
+    return data
+
+
+def from_json_dict(data: dict) -> UsageRecord:
+    data = dict(data)
+    data["bucket_ts"] = datetime.fromisoformat(data["bucket_ts"])
+    return UsageRecord(**data)

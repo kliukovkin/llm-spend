@@ -17,19 +17,12 @@ from __future__ import annotations
 import argparse
 import json
 import random
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from llm_spend.schema import UsageRecord
+from llm_spend.schema import UsageRecord, to_json_dict
 
 DAY = timedelta(days=1)
-
-
-def _record_to_json(record: UsageRecord) -> dict:
-    data = asdict(record)
-    data["bucket_ts"] = record.bucket_ts.isoformat()
-    return data
 
 
 def _daily_records(
@@ -197,7 +190,7 @@ def main() -> None:
     for name, generator in scales.items():
         records = generator(seed=args.seed, days=args.days)
         out_path = args.out / f"{name}.json"
-        out_path.write_text(json.dumps([_record_to_json(r) for r in records], indent=2))
+        out_path.write_text(json.dumps([to_json_dict(r) for r in records], indent=2))
         total_cost = sum(r.cost_usd for r in records)
         print(f"{name}: {len(records)} records, ${total_cost:,.2f} total over {args.days} days -> {out_path}")
 
