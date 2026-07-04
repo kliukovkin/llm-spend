@@ -1,0 +1,31 @@
+[project]
+name = "llm-spend"
+version = "0.1.0"
+description = "Read-only CLI for LLM API spend attribution, forecasting, and same-model what-if analysis"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+  "typer>=0.15",
+  "rich>=13.9",
+  "httpx>=0.28",
+  "pyyaml>=6.0",
+]
+
+[project.scripts]
+llm-spend = "llm_spend.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_spend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+]
