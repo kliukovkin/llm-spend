@@ -1,0 +1,36 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Local data cache (pulled usage/cost data, never committed)
+.llm-spend-cache/
+cache/
+*.cache.json
+
+# Generated reports
+report.html
+*.report.html
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Test / tool artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
