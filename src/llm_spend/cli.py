@@ -15,6 +15,7 @@ from llm_spend.connectors import anthropic as anthropic_connector
 from llm_spend.connectors import openai as openai_connector
 from llm_spend.connectors.anthropic import AnthropicAdminAPIError
 from llm_spend.connectors.openai import OpenAIAdminAPIError
+from llm_spend.report import render
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -68,7 +69,22 @@ def report(
     output: Annotated[Path | None, typer.Option("-o", "--output", help="Output path for --format html")] = None,
 ) -> None:
     """Render a spend report from cached usage data."""
-    raise NotImplementedError(f"report --format {format} output={output} not yet implemented")
+    records = cache.read_records("openai") + cache.read_records("anthropic")
+    if not records:
+        console.print("[red]No cached usage data found.[/red] Run `llm-spend pull` or `llm-spend import` first.")
+        raise typer.Exit(1)
+
+    data = render.build_report(records)
+
+    if format == "terminal":
+        render.render_terminal(data, console=console)
+    elif format == "html":
+        out_path = output or Path("report.html")
+        out_path.write_text(render.render_html(data))
+        console.print(f"Report written to {out_path}")
+    else:
+        console.print(f"[red]unknown format: {format}[/red] (expected terminal or html)")
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

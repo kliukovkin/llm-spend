@@ -41,4 +41,7 @@ v0.1, under active development.
 
 - `pull --provider openai` and `pull --provider anthropic` work: usage+costs,
   pagination, rate-limit backoff.
-- `import` and `report` are still stubbed.
+- `report` works against cached data: attribution, forecast, same-model
+  what-if (batch gap, tier gap, cache hit rate), overspend scenario, and
+  same-weekday anomaly detection, in both terminal and HTML.
+- `import` (CSV, no API key needed) is still stubbed.
