@@ -28,6 +28,12 @@ a hard verdict, so there are two additional guardrails, not a hard gate:
      cost also clears max(1.5x the reference median, reference median +
      absolute_floor). This stops a shift from $0.02 to $0.08 (huge z on a
      near-zero, near-uniform history) from reading as a spend "anomaly".
+     DEFAULT_ABSOLUTE_FLOOR_USD is $1, not $5: a $50/month account's daily
+     baseline is only ~$1.67, so a $5 floor would require a spike 3-4x
+     larger than typical before ever registering — verified against the
+     personal-scale synthetic dataset, where its injected 3.5x-normal-day
+     spike (z-score 35, unambiguous statistically) was blocked entirely by
+     a $5 floor. $1 still fully suppresses trivial cent-level noise.
   2. Confidence tiering: with fewer than MIN_REFERENCE_FOR_CONFIDENCE
      reference points, a finding is still reported but labeled low
      confidence rather than presented as a flat "anomaly" — honest about
@@ -47,7 +53,7 @@ from llm_spend.schema import UsageRecord
 
 MIN_HISTORY_DAYS = 21
 Z_SCORE_THRESHOLD = 2.5
-DEFAULT_ABSOLUTE_FLOOR_USD = 5.0
+DEFAULT_ABSOLUTE_FLOOR_USD = 1.0
 MIN_REFERENCE_FOR_CONFIDENCE = 5
 
 NORMAL_CONFIDENCE = "normal"
