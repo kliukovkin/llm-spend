@@ -46,6 +46,7 @@ src/llm_spend/
   cli.py            # typer app: pull, import, report
   schema.py         # UsageRecord — the common shape everything normalizes to
   pricing.py        # loads pricing.yaml; same-model what-if math only
+  pricing.yaml      # versioned, manually-updated model price table (ships with the package)
   connectors/
     openai.py        # organization usage/completions + costs endpoints
     anthropic.py      # usage_report/messages + cost_report endpoints
@@ -59,7 +60,6 @@ src/llm_spend/
     render.py         # terminal (rich) + one self-contained HTML file
 scripts/
   synth_data.py        # synthetic dataset generator (two scales, injected anomalies)
-pricing.yaml            # versioned, manually-updated model price table
 tests/
 ```
 
