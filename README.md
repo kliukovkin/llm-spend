@@ -39,5 +39,6 @@ llm-spend report
 
 v0.1, under active development.
 
-- `pull --provider openai` works: usage+costs, pagination, rate-limit backoff.
-- `pull --provider anthropic`, `import`, and `report` are still stubbed.
+- `pull --provider openai` and `pull --provider anthropic` work: usage+costs,
+  pagination, rate-limit backoff.
+- `import` and `report` are still stubbed.
