@@ -108,7 +108,7 @@ def _inject_spike(
     return records
 
 
-def generate_personal(seed: int = 0, days: int = 60) -> list[UsageRecord]:
+def generate_personal(seed: int = 0, days: int = 60, inject_spike: bool = True) -> list[UsageRecord]:
     rng = random.Random(seed)
     start = datetime(2026, 4, 1, tzinfo=timezone.utc)
     records = []
@@ -137,10 +137,12 @@ def generate_personal(seed: int = 0, days: int = 60) -> list[UsageRecord]:
     )
 
     records.sort(key=lambda r: r.bucket_ts)
-    return _inject_spike(records, rng, start, days, factor=6.0)
+    if inject_spike:
+        records = _inject_spike(records, rng, start, days, factor=6.0)
+    return records
 
 
-def generate_team(seed: int = 1, days: int = 60) -> list[UsageRecord]:
+def generate_team(seed: int = 1, days: int = 60, inject_spike: bool = True) -> list[UsageRecord]:
     rng = random.Random(seed)
     start = datetime(2026, 4, 1, tzinfo=timezone.utc)
     records = []
@@ -167,7 +169,9 @@ def generate_team(seed: int = 1, days: int = 60) -> list[UsageRecord]:
         )
 
     records.sort(key=lambda r: r.bucket_ts)
-    return _inject_spike(records, rng, start, days, factor=8.0)
+    if inject_spike:
+        records = _inject_spike(records, rng, start, days, factor=8.0)
+    return records
 
 
 SCALES = {
