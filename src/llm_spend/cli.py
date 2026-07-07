@@ -11,15 +11,17 @@ import typer
 from rich.console import Console
 
 from llm_spend import cache
+from llm_spend.connectors import anthropic as anthropic_connector
 from llm_spend.connectors import openai as openai_connector
+from llm_spend.connectors.anthropic import AnthropicAdminAPIError
 from llm_spend.connectors.openai import OpenAIAdminAPIError
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
 
-ADMIN_KEY_ENV_VAR = {
-    "openai": "OPENAI_ADMIN_KEY",
-    "anthropic": "ANTHROPIC_ADMIN_KEY",
+CONNECTORS = {
+    "openai": ("OPENAI_ADMIN_KEY", openai_connector.pull, OpenAIAdminAPIError),
+    "anthropic": ("ANTHROPIC_ADMIN_KEY", anthropic_connector.pull, AnthropicAdminAPIError),
 }
 
 
@@ -29,11 +31,11 @@ def pull(
     since: Annotated[str, typer.Option(help="ISO date, e.g. 2026-06-01")],
 ) -> None:
     """Pull usage/cost data from a provider's admin API into the local cache."""
-    if provider not in ADMIN_KEY_ENV_VAR:
+    if provider not in CONNECTORS:
         console.print(f"[red]unknown provider: {provider}[/red] (expected openai or anthropic)")
         raise typer.Exit(1)
 
-    env_var = ADMIN_KEY_ENV_VAR[provider]
+    env_var, connector_pull, error_cls = CONNECTORS[provider]
     api_key = os.environ.get(env_var)
     if not api_key:
         console.print(f"[red]{env_var} is not set[/red]")
@@ -41,15 +43,11 @@ def pull(
 
     since_dt = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
 
-    if provider == "openai":
-        try:
-            records = openai_connector.pull(api_key, since=since_dt)
-        except OpenAIAdminAPIError as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(1) from exc
-    else:
-        console.print("[yellow]anthropic connector not yet implemented[/yellow]")
-        raise typer.Exit(1)
+    try:
+        records = connector_pull(api_key, since=since_dt)
+    except error_cls as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
 
     path = cache.write_records(provider, records)
     total_cost = sum(r.cost_usd for r in records)
