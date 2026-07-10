@@ -8,6 +8,7 @@ connector.
 
 from __future__ import annotations
 
+import random
 import time
 from collections.abc import Iterator
 
@@ -15,6 +16,11 @@ import httpx
 
 MAX_RETRIES = 5
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+# Caps a hostile or buggy Retry-After value (some servers also send an
+# HTTP-date instead of a seconds count, which isn't a float at all) — fine
+# to wait a while for a one-shot CLI pull, not fine to sleep for hours.
+MAX_RETRY_AFTER_SECONDS = 60.0
+JITTER_SECONDS = 0.5
 
 
 def get_with_backoff(
@@ -28,8 +34,11 @@ def get_with_backoff(
                     f"{path} failed after {MAX_RETRIES} attempts: {response.status_code} {response.text}"
                 )
             retry_after = response.headers.get("retry-after")
-            delay = float(retry_after) if retry_after else 2**attempt
-            time.sleep(delay)
+            try:
+                delay = min(float(retry_after), MAX_RETRY_AFTER_SECONDS) if retry_after else 2**attempt
+            except ValueError:
+                delay = 2**attempt  # not a plain seconds count (e.g. an HTTP-date) — fall back
+            time.sleep(delay + random.uniform(0, JITTER_SECONDS))
             continue
         if response.status_code >= 400:
             raise error_cls(f"{path} returned {response.status_code}: {response.text}")

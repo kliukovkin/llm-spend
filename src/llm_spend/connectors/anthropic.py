@@ -144,7 +144,16 @@ def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | No
                     model=result.get("model"),
                     service_tier=result.get("service_tier"),
                     cost_type=result.get("cost_type") or "tokens",
-                    # amount is a decimal string in cents, e.g. "123.45" -> $1.2345
+                    # amount is documented as a decimal string in the
+                    # lowest currency unit (cents), e.g. "123.45" -> $1.2345:
+                    # https://platform.claude.com/docs/en/api/admin-api/usage-cost/get-cost-report
+                    # ("amount: Cost amount in lowest currency units (e.g.
+                    # cents) as a decimal string.") NOT YET LIVE-VERIFIED —
+                    # no Anthropic admin key was available this session to
+                    # confirm against a real pull the way the OpenAI
+                    # `amount.value` string-vs-number bug was caught. If a
+                    # real Anthropic total looks ~100x off, check here
+                    # first before anything else.
                     amount_usd=float(result["amount"]) / 100,
                 )
             )
@@ -234,3 +243,21 @@ def pull(api_key: str, since: datetime, until: datetime | None = None) -> list[U
         usage_rows = _fetch_usage_rows(client, since, until)
         cost_rows = _fetch_cost_rows(client, since, until)
     return _allocate_cost(usage_rows, cost_rows)
+
+
+def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> float:
+    """Independent cross-check total for the report's reconciliation flag:
+    sums the Cost Report with no group_by at all, over the same range
+    `pull` would cover. Deliberately doesn't reuse `_fetch_cost_rows`/
+    `_allocate_cost` — those are the same cost rows `pull`'s own total is
+    built from, so comparing pull's total against itself can only ever
+    match by construction. This is a second, independent read.
+    """
+    headers = {"x-api-key": api_key, "anthropic-version": ANTHROPIC_VERSION}
+    params = _time_range_params(since, until, COSTS_MAX_LIMIT)
+    total = 0.0
+    with httpx.Client(base_url=BASE_URL, headers=headers, timeout=30.0) as client:
+        for bucket in _http.paginate(client, COSTS_PATH, params, AnthropicAdminAPIError):
+            for result in bucket["results"]:
+                total += float(result["amount"]) / 100
+    return total

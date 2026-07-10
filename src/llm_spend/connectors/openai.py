@@ -113,7 +113,10 @@ def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | No
                     bucket_start=bucket_start,
                     project_id=result.get("project_id"),
                     api_key_id=result.get("api_key_id"),
-                    amount_usd=result["amount"]["value"],
+                    # The live API returns this as a string, unlike the
+                    # numeric literal in OpenAI's own docs example — coerce
+                    # explicitly rather than trust either representation.
+                    amount_usd=float(result["amount"]["value"]),
                 )
             )
     return rows
@@ -184,3 +187,22 @@ def pull(api_key: str, since: datetime, until: datetime | None = None) -> list[U
         usage_rows = _fetch_usage_rows(client, since, until)
         cost_rows = _fetch_cost_rows(client, since, until)
     return _allocate_cost(usage_rows, cost_rows)
+
+
+def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> float:
+    """Independent cross-check total for the report's reconciliation flag:
+    sums the Costs API with no group_by at all, over the same range `pull`
+    would cover. Deliberately doesn't reuse `_fetch_cost_rows`/
+    `_allocate_cost` — those are the same cost rows `pull`'s own total is
+    built from, so comparing pull's total against itself can only ever
+    match by construction and can't catch a dropped page, a missed date
+    range, or a units bug. This is a second, independent read.
+    """
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = _time_range_params(since, until, COSTS_MAX_LIMIT)
+    total = 0.0
+    with httpx.Client(base_url=BASE_URL, headers=headers, timeout=30.0) as client:
+        for bucket in _http.paginate(client, COSTS_PATH, params, OpenAIAdminAPIError):
+            for result in bucket["results"]:
+                total += float(result["amount"]["value"])
+    return total

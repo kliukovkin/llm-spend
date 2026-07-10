@@ -286,3 +286,31 @@ def test_pull_raises_on_non_retryable_error(monkeypatch):
     monkeypatch.setattr(anthropic_connector.httpx, "Client", lambda **kwargs: _client_for(handler))
     with pytest.raises(anthropic_connector.AnthropicAdminAPIError, match="401"):
         anthropic_connector.pull("test-key", since=BUCKET_START)
+
+
+def test_fetch_reconciliation_total_sums_ungrouped_costs(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/organizations/cost_report":
+            assert "group_by" not in request.url.params
+            return httpx.Response(200, json=_cost_page([_cost_result(1050.0), _cost_result(525.0)]))
+        raise AssertionError(f"unexpected path {request.url.path}")
+
+    monkeypatch.setattr(anthropic_connector.httpx, "Client", lambda **kwargs: _client_for(handler))
+    total = anthropic_connector.fetch_reconciliation_total("test-key", since=BUCKET_START)
+    assert total == pytest.approx(15.75)  # (1050+525)/100
+
+
+def test_fetch_reconciliation_total_paginates(monkeypatch):
+    page_one = _cost_page([_cost_result(1000.0)], has_more=True, next_page="cursor1")
+    page_two = _cost_page([_cost_result(500.0)], has_more=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/organizations/cost_report":
+            if request.url.params.get("page") is None:
+                return httpx.Response(200, json=page_one)
+            return httpx.Response(200, json=page_two)
+        raise AssertionError(f"unexpected path {request.url.path}")
+
+    monkeypatch.setattr(anthropic_connector.httpx, "Client", lambda **kwargs: _client_for(handler))
+    total = anthropic_connector.fetch_reconciliation_total("test-key", since=BUCKET_START)
+    assert total == pytest.approx(15.0)  # (1000+500)/100

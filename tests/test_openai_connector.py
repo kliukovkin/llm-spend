@@ -64,7 +64,9 @@ def _cost_page(results, has_more=False, next_page=None):
 def _cost_result(amount, **overrides):
     result = {
         "object": "organization.costs.result",
-        "amount": {"value": amount, "currency": "usd"},
+        # Real API returns this as a string, not a JSON number — fixture
+        # matches live behavior, not OpenAI's (inaccurate) docs example.
+        "amount": {"value": str(amount), "currency": "usd"},
         "project_id": "proj_a",
         "api_key_id": "key_a",
     }
@@ -204,3 +206,31 @@ def test_orphan_cost_bucket_becomes_other_record(monkeypatch):
     assert record.output_tokens == 0
     assert record.cost_usd == 3.25
     assert record.api_key_id == "key_no_usage"
+
+
+def test_fetch_reconciliation_total_sums_ungrouped_costs(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/organization/costs":
+            assert "group_by" not in request.url.params
+            return httpx.Response(200, json=_cost_page([_cost_result(10.5), _cost_result(5.25)]))
+        raise AssertionError(f"unexpected path {request.url.path}")
+
+    monkeypatch.setattr(openai_connector.httpx, "Client", lambda **kwargs: _client_for(handler))
+    total = openai_connector.fetch_reconciliation_total("test-key", since=BUCKET_START)
+    assert total == pytest.approx(15.75)
+
+
+def test_fetch_reconciliation_total_paginates(monkeypatch):
+    page_one = _cost_page([_cost_result(10.0)], has_more=True, next_page="cursor1")
+    page_two = _cost_page([_cost_result(5.0)], has_more=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/organization/costs":
+            if request.url.params.get("page") is None:
+                return httpx.Response(200, json=page_one)
+            return httpx.Response(200, json=page_two)
+        raise AssertionError(f"unexpected path {request.url.path}")
+
+    monkeypatch.setattr(openai_connector.httpx, "Client", lambda **kwargs: _client_for(handler))
+    total = openai_connector.fetch_reconciliation_total("test-key", since=BUCKET_START)
+    assert total == pytest.approx(15.0)

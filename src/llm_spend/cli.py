@@ -21,36 +21,47 @@ app = typer.Typer(no_args_is_help=True)
 console = Console()
 
 CONNECTORS = {
-    "openai": ("OPENAI_ADMIN_KEY", openai_connector.pull, OpenAIAdminAPIError),
-    "anthropic": ("ANTHROPIC_ADMIN_KEY", anthropic_connector.pull, AnthropicAdminAPIError),
+    "openai": ("OPENAI_ADMIN_KEY", openai_connector.pull, openai_connector.fetch_reconciliation_total, OpenAIAdminAPIError),
+    "anthropic": (
+        "ANTHROPIC_ADMIN_KEY",
+        anthropic_connector.pull,
+        anthropic_connector.fetch_reconciliation_total,
+        AnthropicAdminAPIError,
+    ),
 }
 
 
 @app.command()
 def pull(
     provider: Annotated[str, typer.Option(help="openai or anthropic")],
-    since: Annotated[str, typer.Option(help="ISO date, e.g. 2026-06-01")],
+    since: Annotated[str, typer.Option(help="ISO date, e.g. 2026-06-01. Interpreted as UTC midnight.")],
+    until: Annotated[
+        str | None, typer.Option(help="ISO date, exclusive; defaults to now. Interpreted as UTC midnight.")
+    ] = None,
 ) -> None:
     """Pull usage/cost data from a provider's admin API into the local cache."""
     if provider not in CONNECTORS:
         console.print(f"[red]unknown provider: {provider}[/red] (expected openai or anthropic)")
         raise typer.Exit(1)
 
-    env_var, connector_pull, error_cls = CONNECTORS[provider]
+    env_var, connector_pull, fetch_reconciliation_total, error_cls = CONNECTORS[provider]
     api_key = os.environ.get(env_var)
     if not api_key:
         console.print(f"[red]{env_var} is not set[/red]")
         raise typer.Exit(1)
 
     since_dt = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
+    until_dt = datetime.fromisoformat(until).replace(tzinfo=timezone.utc) if until else None
 
     try:
-        records = connector_pull(api_key, since=since_dt)
+        records = connector_pull(api_key, since=since_dt, until=until_dt)
+        reconciliation_total = fetch_reconciliation_total(api_key, since=since_dt, until=until_dt)
     except error_cls as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
 
     path = cache.write_records(provider, records)
+    cache.write_reconciliation_total(provider, reconciliation_total, since_dt, until_dt)
     total_cost = sum(r.cost_usd for r in records)
     console.print(f"Pulled {len(records)} records (${total_cost:,.2f} total) -> {path}")
 
@@ -60,7 +71,8 @@ def import_csv(
     csv: Annotated[Path, typer.Option(help="Path to a usage export CSV")],
 ) -> None:
     """Import usage data from a CSV export instead of an admin API key."""
-    raise NotImplementedError(f"import from {csv} not yet implemented")
+    console.print(f"[yellow]CSV import isn't implemented yet[/yellow] (would import from {csv})")
+    raise typer.Exit(1)
 
 
 @app.command()
@@ -74,7 +86,12 @@ def report(
         console.print("[red]No cached usage data found.[/red] Run `llm-spend pull` or `llm-spend import` first.")
         raise typer.Exit(1)
 
-    data = render.build_report(records)
+    reconciliation_totals = [
+        t for t in (cache.read_reconciliation_total("openai"), cache.read_reconciliation_total("anthropic")) if t is not None
+    ]
+    provider_total = sum(reconciliation_totals) if reconciliation_totals else None
+
+    data = render.build_report(records, provider_total=provider_total)
 
     if format == "terminal":
         render.render_terminal(data, console=console)
