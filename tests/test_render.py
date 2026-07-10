@@ -105,3 +105,29 @@ def test_render_html_batch_gap_uses_heuristic_language():
     if data.batch_gap:
         assert "heuristic" in output.lower()
         assert "doesn't need to be real-time" in output
+        assert "cache interactions" in output.lower()  # html.escape turns "aren't" into an entity
+
+
+def _multi_tier_records():
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    return [
+        make_record(bucket_ts=start, model="m", service_tier="standard", input_tokens=1000, output_tokens=0, cost_usd=2.0),
+        make_record(bucket_ts=start, model="m", service_tier="priority", input_tokens=1000, output_tokens=0, cost_usd=4.0),
+    ]
+
+
+def test_render_terminal_shows_service_tier_gap_with_caveat():
+    data = render.build_report(_multi_tier_records())
+    assert data.service_tier_gap  # sanity: the fixture actually produces a comparison
+    output = _capture_terminal(data)
+    assert "Service tier cost per 1K tokens" in output
+    assert "output token share" in output.lower()
+    assert "blends input and output tokens" in output
+
+
+def test_render_html_shows_service_tier_gap_with_caveat():
+    data = render.build_report(_multi_tier_records())
+    output = render.render_html(data)
+    assert "Service tier cost per 1K tokens" in output
+    assert "output token share" in output.lower()
+    assert "blends input and output tokens" in output

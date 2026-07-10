@@ -163,6 +163,18 @@ def render_terminal(data: ReportData, console: Console | None = None) -> None:
                 row.model, f"${row.actual_cost:,.2f}", f"${row.hypothetical_batch_cost:,.2f}", f"${row.potential_savings:,.2f}"
             )
         console.print(table)
+        console.print(f"[dim]{whatif.BATCH_GAP_CACHE_CAVEAT}[/dim]")
+
+    if data.service_tier_gap:
+        for model, tiers in list(data.service_tier_gap.items())[:5]:
+            table = Table(title=f"Service tier cost per 1K tokens — {model}")
+            table.add_column("tier")
+            table.add_column("cost/1K tokens", justify="right")
+            table.add_column("output token share", justify="right")
+            for row in tiers:
+                table.add_row(row.service_tier, f"${row.cost_per_1k_tokens:.3f}", f"{row.output_token_share:.0%}")
+            console.print(table)
+        console.print(f"[dim]{whatif.SERVICE_TIER_GAP_CAVEAT}[/dim]")
 
     if data.cache_hit_rate:
         table = Table(title="Cache hit rate by model")
@@ -228,7 +240,25 @@ def render_html(data: ReportData) -> str:
         sections.append(
             "<h3>Potential batch savings</h3>"
             "<p class='disclaimer'>Heuristic — only if the workload doesn't need to be real-time.</p>"
+            f"<p class='disclaimer'>{html.escape(whatif.BATCH_GAP_CACHE_CAVEAT)}</p>"
             f"<table><tr><th>model</th><th>actual cost</th><th>potential batch cost</th><th>potential savings</th></tr>{rows}</table>"
+        )
+
+    if data.service_tier_gap:
+        tier_sections = []
+        for model, tiers in list(data.service_tier_gap.items())[:5]:
+            rows = "".join(
+                f"<tr><td>{html.escape(row.service_tier)}</td><td>${row.cost_per_1k_tokens:.3f}</td>"
+                f"<td>{row.output_token_share:.0%}</td></tr>"
+                for row in tiers
+            )
+            tier_sections.append(
+                f"<h4>{html.escape(model)}</h4>"
+                f"<table><tr><th>tier</th><th>cost/1K tokens</th><th>output token share</th></tr>{rows}</table>"
+            )
+        sections.append(
+            "<h3>Service tier cost per 1K tokens</h3>"
+            f"<p class='disclaimer'>{html.escape(whatif.SERVICE_TIER_GAP_CAVEAT)}</p>" + "".join(tier_sections)
         )
 
     if data.cache_hit_rate:
