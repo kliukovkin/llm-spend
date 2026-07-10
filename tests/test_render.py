@@ -50,10 +50,10 @@ def test_build_report_handles_empty_records():
     assert data.anomalies.insufficient_history is True
 
 
-def _capture_terminal(data) -> str:
+def _capture_terminal(data, share: bool = False) -> str:
     buffer = io.StringIO()
     console = Console(file=buffer, force_terminal=False, width=120)
-    render.render_terminal(data, console=console)
+    render.render_terminal(data, console=console, share=share)
     return buffer.getvalue()
 
 
@@ -131,3 +131,78 @@ def test_render_html_shows_service_tier_gap_with_caveat():
     assert "Service tier cost per 1K tokens" in output
     assert "output token share" in output.lower()
     assert "blends input and output tokens" in output
+
+
+def test_render_terminal_share_mode_has_no_dollar_amounts():
+    records = synth_data.generate_team(seed=1, days=60)
+    data = render.build_report(records)
+    output = _capture_terminal(data, share=True)
+    assert "$" not in output
+
+
+def test_render_html_share_mode_has_no_dollar_amounts():
+    records = synth_data.generate_team(seed=1, days=60)
+    data = render.build_report(records)
+    output = render.render_html(data, share=True)
+    assert "$" not in output
+
+
+def test_render_share_mode_masks_real_api_key_and_project_names():
+    records = synth_data.generate_team(seed=1, days=60)
+    data = render.build_report(records)
+    real_keys = [row.value for row in data.by_api_key if row.value != "(none)"]
+    real_projects = [row.value for row in data.by_project if row.value != "(none)"]
+    assert real_keys and real_projects  # sanity: synthetic team data actually has these
+
+    terminal_output = _capture_terminal(data, share=True)
+    html_output = render.render_html(data, share=True)
+
+    for real_value in real_keys + real_projects:
+        assert real_value not in terminal_output
+        assert real_value not in html_output
+
+    assert "key-1" in terminal_output
+    assert "project-1" in terminal_output
+    assert "key-1" in html_output
+    assert "project-1" in html_output
+
+
+def test_render_share_mode_omits_forecast_overspend_and_reconciliation():
+    records = synth_data.generate_team(seed=1, days=60)
+    data = render.build_report(records)
+
+    terminal_output = _capture_terminal(data, share=True)
+    html_output = render.render_html(data, share=True)
+
+    for output in (terminal_output, html_output):
+        assert "Forecast" not in output
+        assert "Overspend scenario" not in output
+        assert "billing dashboard" not in output
+
+
+def test_render_share_mode_keeps_model_names_unmasked():
+    records = synth_data.generate_team(seed=1, days=60)
+    data = render.build_report(records)
+    real_model = data.by_model[0].value
+
+    terminal_output = _capture_terminal(data, share=True)
+    assert real_model in terminal_output
+
+
+def test_render_share_mode_anomaly_shown_as_ratio_not_dollar_amount():
+    records = _spike_records_for_share_test()
+    data = render.build_report(records)
+    assert data.anomalies.anomalies  # sanity: fixture actually produces a flagged anomaly
+
+    output = _capture_terminal(data, share=True)
+    assert "vs. typical" in output
+    assert "x typical" in output
+
+
+def _spike_records_for_share_test():
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    records = []
+    for i in range(56):
+        cost = 50.0 if i == 49 else 1.0
+        records.append(make_record(bucket_ts=start + timedelta(days=i), cost_usd=cost))
+    return records
