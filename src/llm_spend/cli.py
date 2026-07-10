@@ -12,8 +12,10 @@ from rich.console import Console
 
 from llm_spend import cache
 from llm_spend.connectors import anthropic as anthropic_connector
+from llm_spend.connectors import csv_import
 from llm_spend.connectors import openai as openai_connector
 from llm_spend.connectors.anthropic import AnthropicAdminAPIError
+from llm_spend.connectors.csv_import import CSVImportError
 from llm_spend.connectors.openai import OpenAIAdminAPIError
 from llm_spend.report import render
 
@@ -71,14 +73,38 @@ def import_csv(
     csv: Annotated[Path, typer.Option(help="Path to a usage export CSV")],
 ) -> None:
     """Import usage data from a CSV export instead of an admin API key."""
-    console.print(f"[yellow]CSV import isn't implemented yet[/yellow] (would import from {csv})")
-    raise typer.Exit(1)
+    if not csv.exists():
+        console.print(f"[red]{csv} does not exist[/red]")
+        raise typer.Exit(1)
+
+    try:
+        records = csv_import.parse_csv(csv)
+    except CSVImportError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    if not records:
+        console.print(f"[yellow]No rows found in {csv}[/yellow]")
+        raise typer.Exit(1)
+
+    by_provider: dict[str, list] = {}
+    for r in records:
+        by_provider.setdefault(r.provider, []).append(r)
+
+    for provider, provider_records in by_provider.items():
+        path = cache.write_records(provider, provider_records)
+        total_cost = sum(r.cost_usd for r in provider_records)
+        console.print(f"Imported {len(provider_records)} {provider} records (${total_cost:,.2f} total) -> {path}")
 
 
 @app.command()
 def report(
     format: Annotated[str, typer.Option(help="terminal or html")] = "terminal",
     output: Annotated[Path | None, typer.Option("-o", "--output", help="Output path for --format html")] = None,
+    share: Annotated[
+        bool,
+        typer.Option("--share", help="Anonymized: percentages/ratios instead of dollar amounts, masked key/project names"),
+    ] = False,
 ) -> None:
     """Render a spend report from cached usage data."""
     records = cache.read_records("openai") + cache.read_records("anthropic")
@@ -94,10 +120,10 @@ def report(
     data = render.build_report(records, provider_total=provider_total)
 
     if format == "terminal":
-        render.render_terminal(data, console=console)
+        render.render_terminal(data, console=console, share=share)
     elif format == "html":
         out_path = output or Path("report.html")
-        out_path.write_text(render.render_html(data))
+        out_path.write_text(render.render_html(data, share=share))
         console.print(f"Report written to {out_path}")
     else:
         console.print(f"[red]unknown format: {format}[/red] (expected terminal or html)")
