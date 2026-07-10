@@ -32,7 +32,34 @@ This writes `synthetic/personal.json` and `synthetic/team.json` — copy
 either into `.llm-spend-cache/openai.json` (or `anthropic.json`) and run
 `llm-spend report` against it.
 
-CSV import (an alternative to admin API keys) isn't implemented yet.
+### CSV import (no API key)
+
+Don't want to grant an admin key at all? Import a CSV instead. Required
+columns: `bucket_ts, provider, model, input_tokens, output_tokens, cost_usd`.
+Optional: `api_key_id, project, service_tier, batch_flag, cached_tokens`.
+This is llm-spend's own generic schema, not any provider's native export
+format — build one from whatever your provider's console gives you, or
+write one by hand for a handful of rows.
+
+```
+llm-spend import --csv usage_export.csv
+llm-spend report
+```
+
+### Sharing a report safely
+
+`llm-spend report --share` renders an anonymized version: percentages and
+ratios instead of dollar amounts, masked API key/project names ("key-1",
+"project-1", ...). Model names stay visible since they're not private
+identifiers. Sections with no safe percentage substitute for an absolute
+dollar figure (total spend, forecast, overspend scenario, reconciliation)
+are dropped entirely — meant to be safe to screenshot into Slack or a
+public post.
+
+```
+llm-spend report --share
+llm-spend report --share --format html -o report_share.html
+```
 
 ## Security posture
 
@@ -53,16 +80,18 @@ CSV import (an alternative to admin API keys) isn't implemented yet.
   else. Files are written `0600`, and the directory writes its own
   `.gitignore` the first time it's created.
 - **Nothing leaves your machine** beyond the read calls you configure (or a
-  CSV you point it at, once that lands). No telemetry, no analytics, no
-  external requests from the report renderer.
+  CSV you point it at). No telemetry, no analytics, no external requests
+  from the report renderer.
 
 ## Status
 
-v0.1, under active development.
+v0.1, feature-complete for the initial scope described above.
 
 - `pull --provider openai` and `pull --provider anthropic` work: usage+costs,
-  pagination, rate-limit backoff. Verified against a real OpenAI account.
-- `report` works against cached data: attribution, forecast, same-model
-  what-if (batch gap, tier gap, cache hit rate), overspend scenario, and
-  same-weekday anomaly detection, in both terminal and HTML.
-- `import` (CSV, no API key needed) is still stubbed.
+  pagination, rate-limit backoff, an independent reconciliation total.
+  Verified against a real OpenAI account.
+- `import --csv` works: no admin key needed, llm-spend's own generic schema.
+- `report` works against cached data (from either `pull` or `import`):
+  attribution, forecast, same-model what-if (batch gap, tier gap, cache hit
+  rate), overspend scenario, and same-weekday anomaly detection, in both
+  terminal and HTML, plus an anonymized `--share` mode for safe screenshots.
