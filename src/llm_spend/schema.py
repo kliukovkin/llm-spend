@@ -23,6 +23,10 @@ class UsageRecord:
     model: str
     input_tokens: int
     output_tokens: int
+    # TODO(pre-v0.2): float accumulates summation-order drift (~1e-11 on
+    # real datasets) that's harmless for a read-only report but not
+    # acceptable once v0.2 pacing/enforcement makes spend decisions on this
+    # number. Migrate to Decimal or integer cents before then.
     cost_usd: float
     api_key_id: str | None = None
     project: str | None = None
