@@ -104,7 +104,10 @@ def _time_range_params(since: datetime, until: datetime | None, max_limit: int) 
 
 def _fetch_usage_rows(client: httpx.Client, since: datetime, until: datetime | None) -> list[_UsageRow]:
     params = _time_range_params(since, until, USAGE_MAX_LIMIT)
-    params["group_by"] = USAGE_GROUP_BY
+    # Anthropic requires `group_by[]` for array params, unlike OpenAI's
+    # plain repeated-key form (`group_by=a&group_by=b`) — confirmed via a
+    # live 400 against a real admin key.
+    params["group_by[]"] = USAGE_GROUP_BY
     rows = []
     for bucket in _http.paginate(client, USAGE_PATH, params, AnthropicAdminAPIError):
         bucket_start = _parse_bucket_start(bucket)
@@ -132,7 +135,7 @@ def _fetch_usage_rows(client: httpx.Client, since: datetime, until: datetime | N
 
 def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | None) -> list[_CostRow]:
     params = _time_range_params(since, until, COSTS_MAX_LIMIT)
-    params["group_by"] = COSTS_GROUP_BY
+    params["group_by[]"] = COSTS_GROUP_BY
     rows = []
     for bucket in _http.paginate(client, COSTS_PATH, params, AnthropicAdminAPIError):
         bucket_start = _parse_bucket_start(bucket)
@@ -147,13 +150,9 @@ def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | No
                     # amount is documented as a decimal string in the
                     # lowest currency unit (cents), e.g. "123.45" -> $1.2345:
                     # https://platform.claude.com/docs/en/api/admin-api/usage-cost/get-cost-report
-                    # ("amount: Cost amount in lowest currency units (e.g.
-                    # cents) as a decimal string.") NOT YET LIVE-VERIFIED —
-                    # no Anthropic admin key was available this session to
-                    # confirm against a real pull the way the OpenAI
-                    # `amount.value` string-vs-number bug was caught. If a
-                    # real Anthropic total looks ~100x off, check here
-                    # first before anything else.
+                    # Live-verified against a real admin key: a $0.00501
+                    # real-account result matched hand-computed Sonnet-4
+                    # pricing (55 input + 323 output tokens) exactly.
                     amount_usd=float(result["amount"]) / 100,
                 )
             )

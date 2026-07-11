@@ -89,7 +89,7 @@ v0.1, feature-complete for the initial scope described above.
 
 - `pull --provider openai` and `pull --provider anthropic` work: usage+costs,
   pagination, rate-limit backoff, an independent reconciliation total.
-  Verified against a real OpenAI account.
+  Verified against real OpenAI and Anthropic accounts.
 - `import --csv` works: no admin key needed, llm-spend's own generic schema.
 - `report` works against cached data (from either `pull` or `import`):
   attribution, forecast, same-model what-if (batch gap, tier gap, cache hit
