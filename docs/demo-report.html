@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>llm-spend report</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.5rem; }
+  h3 { margin-top: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+  th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #ddd; }
+  th { background: #f5f5f5; }
+  .disclaimer { color: #666; font-size: 0.9rem; font-style: italic; }
+  .total { font-size: 1.75rem; font-weight: bold; }
+  .reconciliation { color: #666; font-size: 0.9rem; }
+  .reconciliation.flagged { color: #b00020; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>llm-spend report</h1>
+<p class="total">$81,499.13</p><p class="reconciliation ">All bucket timestamps are UTC. Cross-check this total against your provider&#x27;s billing dashboard.</p>
+<h3>By model</h3><table><tr><th>value</th><th>cost</th><th>share</th></tr><tr><td>gpt-5.4</td><td>$20,696.95</td><td>25%</td></tr><tr><td>gpt-5.4-mini</td><td>$15,348.58</td><td>19%</td></tr><tr><td>claude-haiku-4-5</td><td>$14,639.04</td><td>18%</td></tr><tr><td>claude-sonnet-5</td><td>$13,114.64</td><td>16%</td></tr><tr><td>gpt-5.5</td><td>$12,965.35</td><td>16%</td></tr><tr><td>claude-opus-4-8</td><td>$4,734.56</td><td>6%</td></tr></table>
+<h3>By API key</h3><table><tr><th>value</th><th>cost</th><th>share</th></tr><tr><td>key_support_bot</td><td>$29,987.63</td><td>37%</td></tr><tr><td>key_backend_svc</td><td>$20,696.95</td><td>25%</td></tr><tr><td>key_research</td><td>$17,699.91</td><td>22%</td></tr><tr><td>key_product_eng</td><td>$13,114.64</td><td>16%</td></tr></table>
+<h3>By project</h3><table><tr><th>value</th><th>cost</th><th>share</th></tr><tr><td>platform</td><td>$33,811.60</td><td>41%</td></tr><tr><td>support</td><td>$29,987.63</td><td>37%</td></tr><tr><td>research</td><td>$17,699.91</td><td>22%</td></tr></table>
+<p><strong>Most expensive day:</strong> 2026-04-30 ($3,508.92)</p>
+<h3>Forecast</h3><p>$40,789.50 by end of month (day 30/31, $1,315.79/day average)</p><p class='disclaimer'>Rough estimate: a straight-line projection of your daily average onto the rest of the month. It has no idea about weekday patterns, one-off spikes, or seasonality — treat it as a ballpark, not a bill.</p>
+<h3>Overspend scenario</h3><p>$105,267.49/month if your worst day repeated every day</p><p class='disclaimer'>Neither OpenAI nor Anthropic enforces a hard spending cap by default — usage can keep accruing past whatever number you have in mind. This is what your worst day repeated every day this month would cost, not a prediction.</p>
+<h3>Anomalies (vs. same weekday's history)</h3><table><tr><th>day</th><th>cost</th><th>z-score</th><th>confidence</th></tr><tr><td>2026-04-30</td><td>$3,508.92</td><td>9.4</td><td>normal</td></tr></table>
+<h3>Potential batch savings</h3><p class='disclaimer'>Heuristic — only if the workload doesn't need to be real-time.</p><p class='disclaimer'>Cache interactions aren&#x27;t modeled — the batch estimate prices all input tokens at the full batch rate, so potential savings are understated for models with a meaningful cache hit rate.</p><table><tr><th>model</th><th>actual cost</th><th>potential batch cost</th><th>potential savings</th></tr><tr><td>gpt-5.4</td><td>$15,424.99</td><td>$7,712.49</td><td>$7,712.49</td></tr><tr><td>gpt-5.4-mini</td><td>$14,115.27</td><td>$7,057.63</td><td>$7,057.63</td></tr><tr><td>claude-haiku-4-5</td><td>$13,679.71</td><td>$6,839.85</td><td>$6,839.85</td></tr><tr><td>gpt-5.5</td><td>$12,965.35</td><td>$6,482.67</td><td>$6,482.67</td></tr><tr><td>claude-sonnet-5</td><td>$11,532.63</td><td>$5,766.31</td><td>$5,766.31</td></tr></table>
+<h3>Cache hit rate by model</h3><table><tr><th>model</th><th>hit rate</th></tr><tr><td>gpt-5.4-mini</td><td>25%</td></tr><tr><td>claude-haiku-4-5</td><td>24%</td></tr><tr><td>gpt-5.4</td><td>25%</td></tr><tr><td>claude-sonnet-5</td><td>24%</td></tr><tr><td>gpt-5.5</td><td>26%</td></tr><tr><td>claude-opus-4-8</td><td>25%</td></tr></table>
+</body>
+</html>

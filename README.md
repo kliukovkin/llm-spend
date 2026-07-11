@@ -4,13 +4,68 @@ Read-only CLI for LLM API spend: attribution, a rough end-of-month forecast,
 and same-model what-if comparisons (batch gap, cache hit rate, service-tier
 gap). Supports OpenAI and Anthropic.
 
+![llm-spend report on synthetic demo data](docs/assets/demo-report.svg)
+
+*Report on synthetic demo data (team-scale profile). Run
+`python scripts/synth_data.py` to reproduce — or
+[see a full sample report](docs/demo-report.html).*
+
 ## Install
+
+Requires Python 3.12+.
 
 ```
 uv pip install -e .
 ```
 
-## Usage
+## Quickstart
+
+Three ways in, from zero commitment to full setup — pick whichever matches
+how much you trust a brand-new CLI with your data right now.
+
+### Path A — Try it in 60 seconds (no account needed)
+
+Generate a synthetic dataset and render a report against it — no API key,
+no CSV, no real data at all:
+
+```
+PYTHONPATH=src python scripts/synth_data.py --scale both --out synthetic/
+mkdir -p .llm-spend-cache
+cp synthetic/team.json .llm-spend-cache/openai.json
+llm-spend report
+```
+
+This writes `synthetic/personal.json` (a ~$50/month solo-developer profile)
+and `synthetic/team.json` (a ~$50K/month team profile), each with an
+injected cost anomaly so the anomaly detector has something to find.
+
+### Path B — Your real data, no API keys (recommended first step)
+
+No admin key, no OAuth, nothing to grant — export a CSV from your
+provider's own dashboard and import it directly:
+
+1. **OpenAI:** Usage & billing dashboard (platform.openai.com, under your
+   organization's **Usage** page) → export/download the usage or cost CSV
+   for the date range you want.
+2. **Anthropic:** Console (console.anthropic.com) → your organization's
+   **Usage** page → export the usage/cost CSV for the date range you want.
+
+   *(Exact menu labels shift as providers redesign their dashboards —
+   if a step above doesn't match what you see, look for an
+   "export"/"download CSV" control on the usage or billing page.)*
+
+3. Reshape it into llm-spend's generic schema (not any provider's native
+   export format) — required columns: `bucket_ts, provider, model,
+   input_tokens, output_tokens, cost_usd`. Optional: `api_key_id, project,
+   service_tier, batch_flag, cached_tokens`. A handful of rows is enough to
+   try it; script the reshape once you're happy with the output.
+
+```
+llm-spend import --csv usage_export.csv
+llm-spend report
+```
+
+### Path C — Full setup (admin API keys)
 
 ```
 export OPENAI_ADMIN_KEY=...      # sk-admin-... — Admin API key with api.usage.read + api.costs.read scopes
@@ -21,30 +76,8 @@ llm-spend pull --provider anthropic --since 2026-06-01
 llm-spend report --format html -o report.html
 ```
 
-Don't have real usage history yet, or just want to see what the report looks
-like? Generate a synthetic dataset instead of pulling from a real account:
-
-```
-PYTHONPATH=src python scripts/synth_data.py --scale both --out synthetic/
-```
-
-This writes `synthetic/personal.json` and `synthetic/team.json` — copy
-either into `.llm-spend-cache/openai.json` (or `anthropic.json`) and run
-`llm-spend report` against it.
-
-### CSV import (no API key)
-
-Don't want to grant an admin key at all? Import a CSV instead. Required
-columns: `bucket_ts, provider, model, input_tokens, output_tokens, cost_usd`.
-Optional: `api_key_id, project, service_tier, batch_flag, cached_tokens`.
-This is llm-spend's own generic schema, not any provider's native export
-format — build one from whatever your provider's console gives you, or
-write one by hand for a handful of rows.
-
-```
-llm-spend import --csv usage_export.csv
-llm-spend report
-```
+Use a key scoped to read-only usage/cost access, not a general-purpose API
+key — see **Security posture** below for exactly which scopes to grant.
 
 ### Sharing a report safely
 
@@ -79,9 +112,42 @@ llm-spend report --share --format html -o report_share.html
   provider with the normalized usage/cost data `pull` retrieved — nothing
   else. Files are written `0600`, and the directory writes its own
   `.gitignore` the first time it's created.
-- **Nothing leaves your machine** beyond the read calls you configure (or a
-  CSV you point it at). No telemetry, no analytics, no external requests
-  from the report renderer.
+
+## What leaves your machine: nothing
+
+`llm-spend` makes exactly the read calls you configure (`pull` against a
+provider's admin API, or nothing at all if you're on the CSV/synthetic
+path) and writes exactly two kinds of file locally: the JSON cache under
+`.llm-spend-cache/` and whatever report file you ask for with `-o`. No
+telemetry, no analytics, no crash reporting, no external requests from the
+report renderer — `render_html`'s output has no `<script>`, no external
+stylesheet, no external image, nothing that phones home when you open it
+in a browser or forward it to someone.
+
+## Troubleshooting
+
+- **OpenAI: "Admin API keys aren't available for this organization."**
+  Admin API keys require your org to be on the **Team** plan, not
+  **Individual** — if you signed up solo, convert first: platform.openai.com
+  → **Settings → Organization → General** → **Convert to Team**. Once
+  converted, create the Admin key under **Settings → Organization → Admin
+  keys** (platform.openai.com/settings/organization/admin-keys) — a
+  different page from the project-scoped **API keys** page.
+- **Anthropic: where's the Admin API key?** console.anthropic.com → your
+  organization's settings → **Admin keys** (a different page from regular
+  workspace API keys) — the key starts with `sk-ant-admin01-`.
+- **Where's the CSV export?** Both providers put it on the same page as
+  the dashboard you'd check to eyeball spend: OpenAI's **Usage** page,
+  Anthropic Console's **Usage** page — look for an export/download control
+  there rather than under a separate "exports" or "reports" section.
+  Dashboard layouts shift; if the exact labels above are stale by the time
+  you're reading this, that's the general place to look.
+
+## Feedback
+
+Found a bug, or something's missing for your workflow?
+[Open an issue](https://github.com/kliukovkin/llm-spend/issues) — or DM me
+on X [@YOUR_HANDLE](https://x.com/YOUR_HANDLE) if that's easier.
 
 ## Status
 
