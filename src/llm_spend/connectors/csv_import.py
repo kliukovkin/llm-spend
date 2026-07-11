@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from llm_spend.schema import UsageRecord
@@ -57,14 +58,14 @@ def _row_to_record(row: dict[str, str], line_number: int) -> UsageRecord:
             model=row["model"].strip(),
             input_tokens=int(row["input_tokens"]),
             output_tokens=int(row["output_tokens"]),
-            cost_usd=float(row["cost_usd"]),
+            cost_usd=Decimal(row["cost_usd"]),
             api_key_id=row.get("api_key_id") or None,
             project=row.get("project") or None,
             service_tier=row.get("service_tier") or None,
             batch_flag=_parse_bool(row["batch_flag"]) if row.get("batch_flag") else False,
             cached_tokens=int(row["cached_tokens"]) if row.get("cached_tokens") else 0,
         )
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, InvalidOperation) as exc:
         raise CSVImportError(f"row {line_number}: {exc}") from exc
 
 

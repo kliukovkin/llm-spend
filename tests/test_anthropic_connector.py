@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -139,7 +140,7 @@ def test_pull_splits_cost_across_token_types_for_same_model(monkeypatch):
     records = anthropic_connector.pull("test-key", since=BUCKET_START)
 
     assert len(records) == 1
-    assert records[0].cost_usd == pytest.approx(1.65)  # (100+10+5+50)/100
+    assert records[0].cost_usd == Decimal("1.65")  # (100+10+5+50)/100
 
 
 def test_pull_splits_cost_proportionally_across_api_keys(monkeypatch):

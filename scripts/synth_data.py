@@ -18,6 +18,7 @@ import argparse
 import json
 import random
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from llm_spend.schema import UsageRecord, to_json_dict
@@ -60,7 +61,7 @@ def _daily_records(
                 model=model,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                cost_usd=round(cost, 6),
+                cost_usd=Decimal(str(round(cost, 6))),
                 api_key_id=api_key_id,
                 project=project,
                 service_tier="default",
@@ -98,7 +99,7 @@ def _inject_spike(
         model=victim.model,
         input_tokens=round(victim.input_tokens * factor),
         output_tokens=round(victim.output_tokens * factor),
-        cost_usd=round(victim.cost_usd * factor, 6),
+        cost_usd=round(victim.cost_usd * Decimal(str(factor)), 6),
         api_key_id=victim.api_key_id,
         project=victim.project,
         service_tier=victim.service_tier,

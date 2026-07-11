@@ -1,5 +1,6 @@
 import io
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 import synth_data
@@ -20,7 +21,7 @@ def test_build_report_reconciles_our_total_by_construction():
 def test_build_report_flags_divergence_over_1_percent():
     records = synth_data.generate_personal(seed=0, days=60)
     total = render.build_report(records).total_cost
-    data = render.build_report(records, provider_total=total * 1.05)  # 5% off
+    data = render.build_report(records, provider_total=total * Decimal("1.05"))  # 5% off
     assert data.reconciliation.flagged is True
     assert data.reconciliation.divergence_pct == pytest.approx(0.05 / 1.05, rel=1e-3)
 
@@ -28,7 +29,7 @@ def test_build_report_flags_divergence_over_1_percent():
 def test_build_report_does_not_flag_divergence_under_1_percent():
     records = synth_data.generate_personal(seed=0, days=60)
     total = render.build_report(records).total_cost
-    data = render.build_report(records, provider_total=total * 1.005)  # 0.5% off
+    data = render.build_report(records, provider_total=total * Decimal("1.005"))  # 0.5% off
     assert data.reconciliation.flagged is False
 
 
@@ -92,7 +93,7 @@ def test_render_html_is_self_contained_with_no_external_assets():
 def test_render_html_flags_reconciliation_divergence_visibly():
     records = synth_data.generate_team(seed=1, days=60)
     total = render.build_report(records).total_cost
-    data = render.build_report(records, provider_total=total * 1.05)
+    data = render.build_report(records, provider_total=total * Decimal("1.05"))
     output = render.render_html(data)
     assert 'class="reconciliation flagged"' in output
     assert "diverges" in output.lower()

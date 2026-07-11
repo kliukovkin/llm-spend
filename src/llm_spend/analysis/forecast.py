@@ -12,6 +12,7 @@ from __future__ import annotations
 import calendar
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 from llm_spend.analysis._timeseries import daily_totals
 from llm_spend.schema import UsageRecord
@@ -27,9 +28,9 @@ DISCLAIMER = (
 class ForecastResult:
     days_elapsed: int
     days_in_month: int
-    spend_so_far: float
-    daily_average: float
-    projected_total: float
+    spend_so_far: Decimal
+    daily_average: Decimal
+    projected_total: Decimal
     disclaimer: str = DISCLAIMER
 
 

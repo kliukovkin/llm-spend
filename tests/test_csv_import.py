@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 
@@ -26,7 +27,7 @@ def test_parses_required_columns_only(tmp_path):
     assert r.model == "gpt-5.4-mini"
     assert r.input_tokens == 1000
     assert r.output_tokens == 200
-    assert r.cost_usd == 0.01
+    assert r.cost_usd == Decimal("0.01")
     assert r.api_key_id is None
     assert r.batch_flag is False
     assert r.cached_tokens == 0

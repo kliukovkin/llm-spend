@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import html
 from dataclasses import dataclass
+from decimal import Decimal
 
 from rich.console import Console
 from rich.panel import Panel
@@ -36,16 +37,16 @@ RECONCILIATION_DIVERGENCE_THRESHOLD = 0.01  # 1%
 
 @dataclass(frozen=True, slots=True)
 class ReconciliationResult:
-    our_total: float
-    provider_total: float | None
-    divergence_pct: float | None
+    our_total: Decimal
+    provider_total: Decimal | None
+    divergence_pct: float | None  # a ratio, not a dollar amount
     flagged: bool
     note: str
 
 
 @dataclass(frozen=True, slots=True)
 class ReportData:
-    total_cost: float
+    total_cost: Decimal
     by_model: list[attribution.BreakdownRow]
     by_api_key: list[attribution.BreakdownRow]
     by_project: list[attribution.BreakdownRow]
@@ -60,11 +61,11 @@ class ReportData:
     reconciliation: ReconciliationResult
 
 
-def _build_reconciliation(our_total: float, provider_total: float | None) -> ReconciliationResult:
+def _build_reconciliation(our_total: Decimal, provider_total: Decimal | None) -> ReconciliationResult:
     divergence_pct = None
     flagged = False
     if provider_total is not None and provider_total > 0:
-        divergence_pct = abs(our_total - provider_total) / provider_total
+        divergence_pct = float(abs(our_total - provider_total) / provider_total)
         flagged = divergence_pct > RECONCILIATION_DIVERGENCE_THRESHOLD
 
     if provider_total is None:
@@ -79,7 +80,7 @@ def _build_reconciliation(our_total: float, provider_total: float | None) -> Rec
     )
 
 
-def build_report(records: list[UsageRecord], provider_total: float | None = None) -> ReportData:
+def build_report(records: list[UsageRecord], provider_total: Decimal | None = None) -> ReportData:
     pricing = load_pricing()
     total = attribution.total_cost(records)
     return ReportData(
@@ -228,7 +229,7 @@ def render_terminal(data: ReportData, console: Console | None = None, share: boo
             table = Table(title=f"Service tier cost per 1K tokens — {model}")
             table.add_column("tier")
             if share:
-                cheapest = min(row.cost_per_1k_tokens for row in tiers) or 1.0
+                cheapest = min(row.cost_per_1k_tokens for row in tiers) or Decimal(1)
                 table.add_column("relative cost", justify="right")
             else:
                 table.add_column("cost/1K tokens", justify="right")
@@ -334,7 +335,7 @@ def render_html(data: ReportData, share: bool = False) -> str:
         tier_sections = []
         for model, tiers in list(data.service_tier_gap.items())[:5]:
             if share:
-                cheapest = min(row.cost_per_1k_tokens for row in tiers) or 1.0
+                cheapest = min(row.cost_per_1k_tokens for row in tiers) or Decimal(1)
                 rows = "".join(
                     f"<tr><td>{html.escape(row.service_tier)}</td><td>{row.cost_per_1k_tokens / cheapest:.0%}</td>"
                     f"<td>{row.output_token_share:.0%}</td></tr>"

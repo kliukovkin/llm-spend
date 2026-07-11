@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import httpx
 
@@ -64,7 +65,7 @@ class _CostRow:
     bucket_start: datetime
     project_id: str | None
     api_key_id: str | None
-    amount_usd: float
+    amount_usd: Decimal
 
 
 def _time_range_params(since: datetime, until: datetime | None, max_limit: int) -> dict:
@@ -116,7 +117,10 @@ def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | No
                     # The live API returns this as a string, unlike the
                     # numeric literal in OpenAI's own docs example — coerce
                     # explicitly rather than trust either representation.
-                    amount_usd=float(result["amount"]["value"]),
+                    # Decimal(str) directly, not float() first: a float
+                    # round-trip would reintroduce the imprecision Decimal
+                    # exists to avoid.
+                    amount_usd=Decimal(result["amount"]["value"]),
                 )
             )
     return rows
@@ -127,10 +131,10 @@ def _join_key(bucket_start: datetime, project_id: str | None, api_key_id: str | 
 
 
 def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> list[UsageRecord]:
-    cost_by_key: dict[tuple, float] = {}
+    cost_by_key: dict[tuple, Decimal] = {}
     for row in cost_rows:
         key = _join_key(row.bucket_start, row.project_id, row.api_key_id)
-        cost_by_key[key] = cost_by_key.get(key, 0.0) + row.amount_usd
+        cost_by_key[key] = cost_by_key.get(key, Decimal(0)) + row.amount_usd
 
     usage_by_key: dict[tuple, list[_UsageRow]] = {}
     for row in usage_rows:
@@ -139,9 +143,11 @@ def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> li
 
     records = []
     for key, rows in usage_by_key.items():
-        total_cost = cost_by_key.get(key, 0.0)
+        total_cost = cost_by_key.get(key, Decimal(0))
         total_tokens = sum(r.input_tokens + r.output_tokens for r in rows) or 1
         for row in rows:
+            # share is a token-volume ratio, not a dollar amount — float
+            # division here (not Decimal) is intentional.
             share = (row.input_tokens + row.output_tokens) / total_tokens
             records.append(
                 UsageRecord(
@@ -150,7 +156,7 @@ def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> li
                     model=row.model or "unknown",
                     input_tokens=row.input_tokens,
                     output_tokens=row.output_tokens,
-                    cost_usd=round(total_cost * share, 6),
+                    cost_usd=round(total_cost * Decimal(str(share)), 6),
                     api_key_id=row.api_key_id,
                     project=row.project_id,
                     service_tier=row.service_tier,
@@ -189,7 +195,7 @@ def pull(api_key: str, since: datetime, until: datetime | None = None) -> list[U
     return _allocate_cost(usage_rows, cost_rows)
 
 
-def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> float:
+def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> Decimal:
     """Independent cross-check total for the report's reconciliation flag:
     sums the Costs API with no group_by at all, over the same range `pull`
     would cover. Deliberately doesn't reuse `_fetch_cost_rows`/
@@ -200,9 +206,9 @@ def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | 
     """
     headers = {"Authorization": f"Bearer {api_key}"}
     params = _time_range_params(since, until, COSTS_MAX_LIMIT)
-    total = 0.0
+    total = Decimal(0)
     with httpx.Client(base_url=BASE_URL, headers=headers, timeout=30.0) as client:
         for bucket in _http.paginate(client, COSTS_PATH, params, OpenAIAdminAPIError):
             for result in bucket["results"]:
-                total += float(result["amount"]["value"])
+                total += Decimal(result["amount"]["value"])
     return total

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
-import pytest
 import synth_data
 
 from llm_spend.analysis import attribution
@@ -85,10 +85,9 @@ def test_top_movers_pct_change_none_when_no_previous_baseline():
 def test_breakdown_sums_match_total_on_synthetic_data():
     records = synth_data.generate_team(seed=1, days=60)
     rows = attribution.breakdown(records, "api_key_id")
-    # Float summation order differs between the per-key partial sums and the
-    # single grand-total sum, so exact equality is flaky (~1e-11 drift) —
-    # not a bug, just floats. See schema.py's cost_usd TODO(pre-v0.2).
-    assert sum(r.cost_usd for r in rows) == pytest.approx(attribution.total_cost(records))
+    # Decimal, unlike float, sums exactly regardless of summation order, so
+    # this is an exact-equality check, not pytest.approx.
+    assert sum((r.cost_usd for r in rows), start=Decimal(0)) == attribution.total_cost(records)
 
 
 def test_most_expensive_day_is_the_injected_spike_on_synthetic_data():
@@ -97,6 +96,6 @@ def test_most_expensive_day_is_the_injected_spike_on_synthetic_data():
     daily = {}
     for r in records:
         d = r.bucket_ts.date()
-        daily[d] = daily.get(d, 0.0) + r.cost_usd
+        daily[d] = daily.get(d, Decimal(0)) + r.cost_usd
     median_cost = sorted(daily.values())[len(daily) // 2]
     assert cost > median_cost * 2  # the injected spike stands out sharply

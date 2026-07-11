@@ -1,10 +1,17 @@
+from decimal import Decimal
+
 from llm_spend.analysis import whatif
 from tests.conftest import make_record
 
 PRICING = {
     "openai": {
-        "gpt-5.4-mini": {"input": 0.75, "output": 4.50, "batch_input": 0.375, "batch_output": 2.25},
-        "gpt-5.5": {"input": 5.00, "output": 30.00},  # no batch pricing on purpose
+        "gpt-5.4-mini": {
+            "input": Decimal("0.75"),
+            "output": Decimal("4.50"),
+            "batch_input": Decimal("0.375"),
+            "batch_output": Decimal("2.25"),
+        },
+        "gpt-5.5": {"input": Decimal("5.00"), "output": Decimal("30.00")},  # no batch pricing on purpose
     }
 }
 
@@ -19,9 +26,9 @@ def test_batch_gap_computes_hypothetical_savings():
     row = rows[0]
     assert row.model == "gpt-5.4-mini"
     # hypothetical: 1M * 0.375/1M + 1M * 2.25/1M = 0.375 + 2.25 = 2.625
-    assert row.hypothetical_batch_cost == 2.625
-    assert row.actual_cost == 5.25
-    assert row.potential_savings == 5.25 - 2.625
+    assert row.hypothetical_batch_cost == Decimal("2.625")
+    assert row.actual_cost == Decimal("5.25")
+    assert row.potential_savings == Decimal("5.25") - Decimal("2.625")
 
 
 def test_batch_gap_resolves_dated_model_snapshot_to_bare_alias_pricing():
@@ -40,7 +47,7 @@ def test_batch_gap_resolves_dated_model_snapshot_to_bare_alias_pricing():
 
     assert len(rows) == 1
     assert rows[0].model == "gpt-5.4-mini-2026-03-17"  # display name stays exact
-    assert rows[0].hypothetical_batch_cost == 2.625  # pricing resolved via the bare alias
+    assert rows[0].hypothetical_batch_cost == Decimal("2.625")  # pricing resolved via the bare alias
 
 
 def test_batch_gap_excludes_already_batched_usage():
@@ -68,9 +75,9 @@ def test_service_tier_gap_compares_realized_cost_per_token():
     assert "m" in result
     rows = result["m"]
     assert rows[0].service_tier == "standard"  # cheaper tier sorts first
-    assert rows[0].cost_per_1k_tokens == 2.0
+    assert rows[0].cost_per_1k_tokens == Decimal("2.0")
     assert rows[1].service_tier == "priority"
-    assert rows[1].cost_per_1k_tokens == 4.0
+    assert rows[1].cost_per_1k_tokens == Decimal("4.0")
 
 
 def test_service_tier_gap_reports_output_token_share():

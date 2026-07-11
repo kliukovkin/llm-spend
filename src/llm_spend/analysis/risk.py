@@ -46,6 +46,7 @@ import calendar
 import statistics
 from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 
 from llm_spend.analysis import attribution
 from llm_spend.analysis._timeseries import daily_totals
@@ -53,7 +54,7 @@ from llm_spend.schema import UsageRecord
 
 MIN_HISTORY_DAYS = 21
 Z_SCORE_THRESHOLD = 2.5
-DEFAULT_ABSOLUTE_FLOOR_USD = 1.0
+DEFAULT_ABSOLUTE_FLOOR_USD = Decimal("1.0")
 MIN_REFERENCE_FOR_CONFIDENCE = 5
 
 NORMAL_CONFIDENCE = "normal"
@@ -70,9 +71,9 @@ OVERSPEND_NOTE = (
 @dataclass(frozen=True, slots=True)
 class OverspendScenario:
     most_expensive_day: date
-    most_expensive_day_cost: float
+    most_expensive_day_cost: Decimal
     days_in_month: int
-    worst_case_projection: float
+    worst_case_projection: Decimal
     note: str = OVERSPEND_NOTE
 
 
@@ -94,12 +95,12 @@ def overspend_scenario(records: list[UsageRecord], as_of: date | None = None) ->
 @dataclass(frozen=True, slots=True)
 class Anomaly:
     day: date
-    cost_usd: float
-    reference_mean: float
-    reference_median: float
-    reference_stddev: float
+    cost_usd: Decimal
+    reference_mean: Decimal
+    reference_median: Decimal
+    reference_stddev: Decimal
     reference_count: int
-    z_score: float
+    z_score: float  # a statistical measure, not a dollar amount
     confidence: str
 
 
@@ -114,7 +115,7 @@ class AnomalyResult:
 def detect_anomalies(
     records: list[UsageRecord],
     z_threshold: float = Z_SCORE_THRESHOLD,
-    absolute_floor: float = DEFAULT_ABSOLUTE_FLOOR_USD,
+    absolute_floor: Decimal = DEFAULT_ABSOLUTE_FLOOR_USD,
     min_reference_for_confidence: int = MIN_REFERENCE_FOR_CONFIDENCE,
 ) -> AnomalyResult:
     totals = daily_totals(records)
@@ -130,7 +131,7 @@ def detect_anomalies(
             ),
         )
 
-    by_weekday: dict[int, list[tuple[date, float]]] = {}
+    by_weekday: dict[int, list[tuple[date, Decimal]]] = {}
     for day, cost in totals.items():
         by_weekday.setdefault(day.weekday(), []).append((day, cost))
 
@@ -148,9 +149,9 @@ def detect_anomalies(
             if ref_stddev == 0:
                 z = float("inf") if target_cost != ref_mean else 0.0
             else:
-                z = (target_cost - ref_mean) / ref_stddev
+                z = float((target_cost - ref_mean) / ref_stddev)
 
-            materiality_floor = max(1.5 * ref_median, ref_median + absolute_floor)
+            materiality_floor = max(Decimal("1.5") * ref_median, ref_median + absolute_floor)
             if z > z_threshold and target_cost > materiality_floor:
                 confidence = LOW_CONFIDENCE if len(reference) < min_reference_for_confidence else NORMAL_CONFIDENCE
                 anomalies.append(

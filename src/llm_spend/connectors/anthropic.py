@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import httpx
 
@@ -80,7 +81,7 @@ class _CostRow:
     model: str | None  # None for non-token cost_types
     service_tier: str | None
     cost_type: str
-    amount_usd: float
+    amount_usd: Decimal
 
 
 def _rfc3339(dt: datetime) -> str:
@@ -153,7 +154,9 @@ def _fetch_cost_rows(client: httpx.Client, since: datetime, until: datetime | No
                     # Live-verified against a real admin key: a $0.00501
                     # real-account result matched hand-computed Sonnet-4
                     # pricing (55 input + 323 output tokens) exactly.
-                    amount_usd=float(result["amount"]) / 100,
+                    # Decimal(str) directly, not float() first, then /100 —
+                    # avoids reintroducing float imprecision.
+                    amount_usd=Decimal(result["amount"]) / 100,
                 )
             )
     return rows
@@ -164,15 +167,15 @@ def _usage_join_key(row: _UsageRow) -> tuple:
 
 
 def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> list[UsageRecord]:
-    token_cost_by_key: dict[tuple, float] = {}
-    other_cost_by_key: dict[tuple, float] = {}
+    token_cost_by_key: dict[tuple, Decimal] = {}
+    other_cost_by_key: dict[tuple, Decimal] = {}
     for row in cost_rows:
         if row.cost_type == "tokens" and row.model is not None:
             key = (row.bucket_start, row.workspace_id, row.model, row.service_tier)
-            token_cost_by_key[key] = token_cost_by_key.get(key, 0.0) + row.amount_usd
+            token_cost_by_key[key] = token_cost_by_key.get(key, Decimal(0)) + row.amount_usd
         else:
             other_key = (row.bucket_start, row.workspace_id, row.cost_type)
-            other_cost_by_key[other_key] = other_cost_by_key.get(other_key, 0.0) + row.amount_usd
+            other_cost_by_key[other_key] = other_cost_by_key.get(other_key, Decimal(0)) + row.amount_usd
 
     usage_by_key: dict[tuple, list[_UsageRow]] = {}
     for row in usage_rows:
@@ -180,9 +183,11 @@ def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> li
 
     records = []
     for key, rows in usage_by_key.items():
-        total_cost = token_cost_by_key.get(key, 0.0)
+        total_cost = token_cost_by_key.get(key, Decimal(0))
         total_tokens = sum(r.input_tokens + r.output_tokens for r in rows) or 1
         for row in rows:
+            # share is a token-volume ratio, not a dollar amount — float
+            # division here (not Decimal) is intentional.
             share = (row.input_tokens + row.output_tokens) / total_tokens
             records.append(
                 UsageRecord(
@@ -191,7 +196,7 @@ def _allocate_cost(usage_rows: list[_UsageRow], cost_rows: list[_CostRow]) -> li
                     model=row.model or "unknown",
                     input_tokens=row.input_tokens,
                     output_tokens=row.output_tokens,
-                    cost_usd=round(total_cost * share, 6),
+                    cost_usd=round(total_cost * Decimal(str(share)), 6),
                     api_key_id=row.api_key_id,
                     project=row.workspace_id,
                     service_tier=row.service_tier,
@@ -244,7 +249,7 @@ def pull(api_key: str, since: datetime, until: datetime | None = None) -> list[U
     return _allocate_cost(usage_rows, cost_rows)
 
 
-def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> float:
+def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | None = None) -> Decimal:
     """Independent cross-check total for the report's reconciliation flag:
     sums the Cost Report with no group_by at all, over the same range
     `pull` would cover. Deliberately doesn't reuse `_fetch_cost_rows`/
@@ -254,9 +259,9 @@ def fetch_reconciliation_total(api_key: str, since: datetime, until: datetime | 
     """
     headers = {"x-api-key": api_key, "anthropic-version": ANTHROPIC_VERSION}
     params = _time_range_params(since, until, COSTS_MAX_LIMIT)
-    total = 0.0
+    total = Decimal(0)
     with httpx.Client(base_url=BASE_URL, headers=headers, timeout=30.0) as client:
         for bucket in _http.paginate(client, COSTS_PATH, params, AnthropicAdminAPIError):
             for result in bucket["results"]:
-                total += float(result["amount"]) / 100
+                total += Decimal(result["amount"]) / 100
     return total

@@ -1,5 +1,6 @@
 import stat
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from llm_spend import cache
 from llm_spend.schema import UsageRecord
@@ -12,7 +13,7 @@ def _record(**overrides):
         model="gpt-5.4",
         input_tokens=1000,
         output_tokens=200,
-        cost_usd=0.0055,
+        cost_usd=Decimal("0.0055"),
     )
     defaults.update(overrides)
     return UsageRecord(**defaults)
@@ -55,16 +56,16 @@ def test_write_then_read_reconciliation_total(tmp_path):
     since = datetime(2026, 6, 1, tzinfo=timezone.utc)
     until = datetime(2026, 6, 30, tzinfo=timezone.utc)
 
-    cache.write_reconciliation_total("openai", 123.45, since, until, cache_dir=cache_dir)
+    cache.write_reconciliation_total("openai", Decimal("123.45"), since, until, cache_dir=cache_dir)
     total = cache.read_reconciliation_total("openai", cache_dir=cache_dir)
 
-    assert total == 123.45
+    assert total == Decimal("123.45")
 
 
 def test_reconciliation_total_file_is_0600(tmp_path):
     cache_dir = tmp_path / ".llm-spend-cache"
     since = datetime(2026, 6, 1, tzinfo=timezone.utc)
-    path = cache.write_reconciliation_total("openai", 1.0, since, None, cache_dir=cache_dir)
+    path = cache.write_reconciliation_total("openai", Decimal("1.0"), since, None, cache_dir=cache_dir)
     mode = stat.S_IMODE(path.stat().st_mode)
     assert mode == 0o600
 

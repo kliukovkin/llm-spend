@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 from llm_spend.schema import UsageRecord, from_json_dict, to_json_dict
@@ -52,7 +53,7 @@ def read_records(provider: str, cache_dir: Path = DEFAULT_CACHE_DIR) -> list[Usa
 
 def write_reconciliation_total(
     provider: str,
-    total_usd: float,
+    total_usd: Decimal,
     since: datetime,
     until: datetime | None,
     cache_dir: Path = DEFAULT_CACHE_DIR,
@@ -62,14 +63,15 @@ def write_reconciliation_total(
     per-record cache file since it's a single number, not a list of
     UsageRecord, and each `pull` call fully overwrites the prior one for
     that provider — so this always covers exactly the same window as the
-    records cached alongside it.
+    records cached alongside it. Written as a string, like cost_usd in
+    schema.py: json has no Decimal type.
     """
     _ensure_cache_dir(cache_dir)
     path = cache_dir / f"{provider}.reconciliation.json"
     _write_json_0600(
         path,
         {
-            "total_usd": total_usd,
+            "total_usd": str(total_usd),
             "since": since.isoformat(),
             "until": until.isoformat() if until else None,
         },
@@ -77,8 +79,8 @@ def write_reconciliation_total(
     return path
 
 
-def read_reconciliation_total(provider: str, cache_dir: Path = DEFAULT_CACHE_DIR) -> float | None:
+def read_reconciliation_total(provider: str, cache_dir: Path = DEFAULT_CACHE_DIR) -> Decimal | None:
     path = cache_dir / f"{provider}.reconciliation.json"
     if not path.exists():
         return None
-    return json.loads(path.read_text())["total_usd"]
+    return Decimal(json.loads(path.read_text())["total_usd"])

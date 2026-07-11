@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Literal
 
 Provider = Literal["openai", "anthropic"]
@@ -23,11 +24,12 @@ class UsageRecord:
     model: str
     input_tokens: int
     output_tokens: int
-    # TODO(pre-v0.2): float accumulates summation-order drift (~1e-11 on
-    # real datasets) that's harmless for a read-only report but not
-    # acceptable once v0.2 pacing/enforcement makes spend decisions on this
-    # number. Migrate to Decimal or integer cents before then.
-    cost_usd: float
+    # Decimal, not float: real per-record costs go below a cent (e.g. a
+    # live-verified Anthropic pull produced $0.00501), and float summation
+    # drifts by summation order — harmless for a read-only report today but
+    # not once a future pacing/enforcement feature makes spend decisions on
+    # this number.
+    cost_usd: Decimal
     api_key_id: str | None = None
     project: str | None = None
     service_tier: str | None = None
@@ -49,13 +51,20 @@ class UsageRecord:
 
 
 def to_json_dict(record: UsageRecord) -> dict:
-    """JSON-safe representation, used by both the pull cache and synth_data."""
+    """JSON-safe representation, used by both the pull cache and synth_data.
+
+    `cost_usd` is written as a string, not a JSON number: `json` has no
+    Decimal type, and round-tripping Decimal through a float would
+    reintroduce the exact imprecision this schema uses Decimal to avoid.
+    """
     data = asdict(record)
     data["bucket_ts"] = record.bucket_ts.isoformat()
+    data["cost_usd"] = str(record.cost_usd)
     return data
 
 
 def from_json_dict(data: dict) -> UsageRecord:
     data = dict(data)
     data["bucket_ts"] = datetime.fromisoformat(data["bucket_ts"])
+    data["cost_usd"] = Decimal(data["cost_usd"])
     return UsageRecord(**data)

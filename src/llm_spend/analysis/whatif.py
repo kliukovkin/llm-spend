@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 
 from llm_spend.schema import UsageRecord
 
@@ -34,17 +35,17 @@ def _resolve_model_pricing(pricing: dict, provider: str, model: str) -> dict | N
 class BatchGapRow:
     provider: str
     model: str
-    actual_cost: float
-    hypothetical_batch_cost: float
-    potential_savings: float
+    actual_cost: Decimal
+    hypothetical_batch_cost: Decimal
+    potential_savings: Decimal
 
 
 @dataclass(frozen=True, slots=True)
 class TierRow:
     service_tier: str
-    total_cost: float
+    total_cost: Decimal
     total_tokens: int
-    cost_per_1k_tokens: float
+    cost_per_1k_tokens: Decimal
     output_token_share: float  # output_tokens / total_tokens — see SERVICE_TIER_GAP_CAVEAT
 
 
@@ -89,7 +90,7 @@ def batch_gap(records: list[UsageRecord], pricing: dict) -> list[BatchGapRow]:
         model_pricing = _resolve_model_pricing(pricing, provider, model)
         if not model_pricing or "batch_input" not in model_pricing or "batch_output" not in model_pricing:
             continue
-        actual_cost = sum(r.cost_usd for r in recs)
+        actual_cost = sum((r.cost_usd for r in recs), start=Decimal(0))
         input_tokens = sum(r.input_tokens for r in recs)
         output_tokens = sum(r.output_tokens for r in recs)
         hypothetical_cost = (
@@ -148,8 +149,8 @@ def service_tier_gap(records: list[UsageRecord]) -> dict[str, list[TierRow]]:
             input_tokens = sum(r.input_tokens for r in recs)
             output_tokens = sum(r.output_tokens for r in recs)
             total_tokens = input_tokens + output_tokens
-            total_cost = sum(r.cost_usd for r in recs)
-            cost_per_1k = (total_cost / total_tokens * 1000) if total_tokens else 0.0
+            total_cost = sum((r.cost_usd for r in recs), start=Decimal(0))
+            cost_per_1k = (total_cost / total_tokens * 1000) if total_tokens else Decimal(0)
             output_share = (output_tokens / total_tokens) if total_tokens else 0.0
             rows.append(
                 TierRow(
