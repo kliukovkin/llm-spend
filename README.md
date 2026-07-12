@@ -146,8 +146,7 @@ in a browser or forward it to someone.
 ## Feedback
 
 Found a bug, or something's missing for your workflow?
-[Open an issue](https://github.com/kliukovkin/llm-spend/issues) — or DM me
-on X [@YOUR_HANDLE](https://x.com/YOUR_HANDLE) if that's easier.
+[Open an issue](https://github.com/kliukovkin/llm-spend/issues).
 
 ## Status
 

@@ -16,6 +16,9 @@ cache/
 report.html
 *.report.html
 
+# Launch prep drafts (not for public repo before/around launch)
+docs/launch/
+
 # Python
 __pycache__/
 *.py[cod]
