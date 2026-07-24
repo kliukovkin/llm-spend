@@ -18,6 +18,7 @@ from llm_spend.connectors.anthropic import AnthropicAdminAPIError
 from llm_spend.connectors.csv_import import CSVImportError
 from llm_spend.connectors.openai import OpenAIAdminAPIError
 from llm_spend.report import render
+from llm_spend.schema import UsageRecord
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -31,6 +32,20 @@ CONNECTORS = {
         AnthropicAdminAPIError,
     ),
 }
+
+
+def _parse_utc_midnight(value: str) -> datetime:
+    return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+
+
+def _filter_records_by_window(
+    records: list[UsageRecord], since: datetime | None, until: datetime | None
+) -> list[UsageRecord]:
+    if since is not None:
+        records = [r for r in records if r.bucket_ts >= since]
+    if until is not None:
+        records = [r for r in records if r.bucket_ts < until]
+    return records
 
 
 @app.command()
@@ -52,8 +67,8 @@ def pull(
         console.print(f"[red]{env_var} is not set[/red]")
         raise typer.Exit(1)
 
-    since_dt = datetime.fromisoformat(since).replace(tzinfo=timezone.utc)
-    until_dt = datetime.fromisoformat(until).replace(tzinfo=timezone.utc) if until else None
+    since_dt = _parse_utc_midnight(since)
+    until_dt = _parse_utc_midnight(until) if until else None
 
     try:
         records = connector_pull(api_key, since=since_dt, until=until_dt)
@@ -105,6 +120,12 @@ def report(
         bool,
         typer.Option("--share", help="Anonymized: percentages/ratios instead of dollar amounts, masked key/project names"),
     ] = False,
+    since: Annotated[
+        str | None, typer.Option(help="ISO date, inclusive. Interpreted as UTC midnight.")
+    ] = None,
+    until: Annotated[
+        str | None, typer.Option(help="ISO date, exclusive. Interpreted as UTC midnight.")
+    ] = None,
 ) -> None:
     """Render a spend report from cached usage data."""
     records = cache.read_records("openai") + cache.read_records("anthropic")
@@ -112,10 +133,17 @@ def report(
         console.print("[red]No cached usage data found.[/red] Run `llm-spend pull` or `llm-spend import` first.")
         raise typer.Exit(1)
 
+    since_dt = _parse_utc_midnight(since) if since else None
+    until_dt = _parse_utc_midnight(until) if until else None
+    records = _filter_records_by_window(records, since_dt, until_dt)
+    if not records:
+        console.print("[red]No cached usage data found for the requested report window.[/red]")
+        raise typer.Exit(1)
+
     reconciliation_totals = [
         t for t in (cache.read_reconciliation_total("openai"), cache.read_reconciliation_total("anthropic")) if t is not None
     ]
-    provider_total = sum(reconciliation_totals) if reconciliation_totals else None
+    provider_total = sum(reconciliation_totals) if reconciliation_totals and since_dt is None and until_dt is None else None
 
     data = render.build_report(records, provider_total=provider_total)
 

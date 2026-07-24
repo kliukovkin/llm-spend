@@ -76,6 +76,14 @@ llm-spend pull --provider anthropic --since 2026-06-01
 llm-spend report --format html -o report.html
 ```
 
+Reports can be scoped to a cached window without re-pulling data. Dates use
+the same UTC-midnight, inclusive `--since` / exclusive `--until` semantics as
+`pull`:
+
+```
+llm-spend report --since 2026-06-01 --until 2026-06-08
+```
+
 Use a key scoped to read-only usage/cost access, not a general-purpose API
 key — see **Security posture** below for exactly which scopes to grant.
 
