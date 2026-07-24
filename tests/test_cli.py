@@ -51,9 +51,16 @@ def test_report_filtered_window_does_not_compare_against_unfiltered_reconciliati
     )
 
     result = runner.invoke(app, ["report", "--since", "2026-06-03", "--until", "2026-06-08"])
+    output = " ".join(result.output.split())  # rich wraps long lines; normalize before substring checks
 
     assert result.exit_code == 0
-    assert "billing dashboard total diverges" not in result.output
+    # The cached reconciliation total ($30) covers the full unfiltered
+    # window, not this 5-day slice ($5) — comparing them would always
+    # "diverge". Assert on the actual copy render.py emits when no
+    # provider_total was passed in, not just the absence of the flagged
+    # message (which this vacuously satisfies even if suppression breaks).
+    assert "This diverges from the provider's total" not in output
+    assert "Cross-check this total against your provider's billing dashboard" in output
 
 
 def test_report_errors_when_filters_match_no_cached_records(tmp_path, monkeypatch):
